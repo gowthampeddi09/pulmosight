@@ -1,4 +1,4 @@
-# PulmoSight — Advanced AI Medical Intelligence Platform for Chest X-Ray Pneumonia Detection
+# PulmoSight — Advanced Medical AI Intelligence Platform
 
 PulmoSight is a production-grade, full-stack medical AI web application for Chest X-Ray Pneumonia detection. It combines deep learning computer vision (EfficientNet-B0), visual explainability (Grad-CAM), multi-provider LLM clinical report generation (Google Gemini 2.0 Flash with Groq fallback), and automated PDF report generation into a secure, responsive web platform.
 
@@ -134,6 +134,26 @@ $$\text{pos\_weight} = \frac{N_{\text{normal}}}{N_{\text{pneumonia}}} = \frac{13
 
 #### Justification over Weighted Random Sampler
 Weighted loss directly scales gradient contributions without duplicating minority samples in mini-batches. This prevents the model from overfitting to repeated augmented copies of normal scans.
+
+---
+
+## 📈 Empirical Test Performance & Evaluation
+
+Evaluating the fine-tuned EfficientNet-B0 model on the unseen Kaggle test dataset ($N=624$ images: 234 Normal, 390 Pneumonia) produced the following real-world results:
+
+| Metric | Empirical Score | Clinical Target | Assessment |
+| :--- | :---: | :---: | :--- |
+| **Recall / Sensitivity (Pneumonia)** | **98.72%** | $\ge 96.0\%$ | **Exceeds Target** (Only 5 false negatives out of 390 cases) |
+| **ROC-AUC** | **0.9515** | $\ge 0.950$ | **Exceeds Target** (Strong threshold discrimination) |
+| **F1-Score** | **0.9006** | $\ge 0.880$ | **Optimal Harmonic Balance** |
+| **Overall Accuracy** | **86.38%** | $\ge 85.0\%$ | **Solid Baseline** |
+| **Precision (Pneumonia)** | **82.80%** | $\ge 80.0\%$ | Controlled trade-off for high sensitivity |
+
+### Confusion Matrix Breakdown
+$$\begin{pmatrix} \text{True Normal (TN): } 154 & \text{False Pneumonia (FP): } 80 \\ \text{False Normal (FN): } 5 & \text{True Pneumonia (TP): } 385 \end{pmatrix}$$
+
+### Clinical Trade-Off Analysis
+In emergency triage and chest radiography screening, **False Negatives are life-threatening** (sending a patient with active pneumonia home untreated). By weighting the loss function toward positive sensitivity, PulmoSight achieves an **outstanding 98.72% recall** (missing only 5 out of 390 real pneumonia scans). The 80 false positives are acceptable in clinical screening as they prompt follow-up radiological review rather than diagnostic omission.
 
 ---
 
