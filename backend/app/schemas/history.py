@@ -1,18 +1,18 @@
-import uuid
-from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import Optional
+
+from app.schemas.prediction import PredictionResponse
 
 
 class HistoryFilters(BaseModel):
     label: Optional[str] = None
-    date_from: Optional[datetime] = None
-    date_to: Optional[datetime] = None
+    date_from: Optional[str] = None
+    date_to: Optional[str] = None
     search: Optional[str] = None
 
 
 class PaginatedResponse(BaseModel):
-    items: list
+    items: list[PredictionResponse]
     total: int
     page: int
     per_page: int

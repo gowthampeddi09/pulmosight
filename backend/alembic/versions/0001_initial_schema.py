@@ -18,10 +18,6 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Create enum type for prediction labels
-    prediction_label_enum = postgresql.ENUM('PNEUMONIA', 'NORMAL', name='prediction_label')
-    prediction_label_enum.create(op.get_bind(), checkfirst=True)
-
     # Users Table
     op.create_table(
         'users',
@@ -35,7 +31,7 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)
 
-    # Predictions Table
+    # Predictions Table (sa.Enum automatically handles creation of prediction_label enum type)
     op.create_table(
         'predictions',
         sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True),

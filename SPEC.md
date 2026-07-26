@@ -25,13 +25,14 @@ TECH STACK
 - Backend: FastAPI, Python 3.11, SQLAlchemy ORM, PostgreSQL, JWT auth, Pydantic v2
 - DL: PyTorch, EfficientNet-B0 (timm or torchvision weights, transfer learning)
 - XAI: Grad-CAM (implement or use pytorch-grad-cam) on the final conv block
-- LLM: Anthropic API via the `anthropic` Python SDK — structured prompt, not "explain this"
-- Frontend: Next.js (App Router), TypeScript, Tailwind CSS, shadcn/ui
+- LLM: Google Gemini 2.0 Flash (primary, free tier) via `google-generativeai` SDK +
+  Groq Llama 3.1 70B (fallback, free tier) — structured prompt, not "explain this"
+- Frontend: Next.js (App Router), TypeScript, Tailwind CSS
 - Deployment: Docker + docker-compose (frontend, backend, postgres)
 - Testing: pytest, 8-12 real tests covering API endpoints and service-layer logic
 
 FOLDER STRUCTURE
-medical-ai/
+pulmosight/
   backend/
     app/
       api/          (route definitions only — thin controllers)
@@ -42,7 +43,7 @@ medical-ai/
       utils/         (image validation, logging config, file handling)
       inference/     (model loading + prediction logic)
       xai/           (grad-cam implementation)
-      llm/           (prompt construction + Anthropic API client)
+      llm/           (prompt construction + Gemini/Groq API client)
     tests/
     Dockerfile
     requirements.txt
@@ -107,8 +108,9 @@ EXPLAINABILITY (app/xai/)
   region shows highest activation — feeds the LLM prompt as structured input
 
 LLM INTEGRATION (app/llm/)
-- Anthropic API (claude-sonnet-4-6 model string) via the official `anthropic` SDK
-- Never hardcode the API key — load from ANTHROPIC_API_KEY env var
+- Google Gemini 2.0 Flash via `google-generativeai` SDK (primary, free tier)
+- Groq Llama 3.1 70B via `groq` SDK (secondary fallback, free tier)
+- Never hardcode API keys — load from GOOGLE_API_KEY / GROQ_API_KEY env vars
 - Structured prompt: prediction label, confidence, model version, Grad-CAM textual
   observation, optional patient age/gender/symptoms
 - LLM must return: Clinical Summary, Possible Differential Considerations,

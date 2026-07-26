@@ -1,9 +1,12 @@
+import uuid
+import time
 import logging
 from typing import Optional
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query, Response
 from fastapi.responses import FileResponse, Response
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.session import get_db
@@ -34,16 +37,27 @@ settings = get_settings()
 
 router = APIRouter()
 
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Runtime metrics collector — lightweight in-memory counters for /metrics
+# ---------------------------------------------------------------------------
+_metrics = {
+    "request_count": 0,
+    "total_latency_ms": 0.0,
+    "prediction_count": 0,
+    "report_count": 0,
+}
+
+
+# ---------------------------------------------------------------------------
 # System & Health Endpoints
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 
 @router.get("/health", response_model=HealthResponse)
 async def health_check(db: AsyncSession = Depends(get_db)):
     """Check database connectivity and model initialization state."""
     db_status = "connected"
     try:
-        await db.execute("SELECT 1")
+        await db.execute(text("SELECT 1"))
     except Exception as e:
         log.error("Health check database failure: %s", e)
         db_status = "disconnected"
@@ -70,9 +84,26 @@ async def get_model_info():
         metrics=metadata.get("metrics"),
     )
 
-# -----------------------------------------------------------------------------
+
+@router.get("/metrics")
+async def get_runtime_metrics():
+    """Basic runtime metrics: request count, average latency, prediction/report counts."""
+    avg_latency = (
+        round(_metrics["total_latency_ms"] / _metrics["request_count"], 2)
+        if _metrics["request_count"] > 0
+        else 0.0
+    )
+    return {
+        "request_count": _metrics["request_count"],
+        "average_latency_ms": avg_latency,
+        "prediction_count": _metrics["prediction_count"],
+        "report_count": _metrics["report_count"],
+    }
+
+
+# ---------------------------------------------------------------------------
 # Auth Endpoints
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 
 @router.post("/auth/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
@@ -108,7 +139,6 @@ async def refresh(req: RefreshRequest):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=make_error("INVALID_TOKEN", "Invalid or expired refresh token"),
         )
-    import uuid
     user_id = uuid.UUID(payload["sub"])
     return create_tokens(user_id)
 
@@ -118,9 +148,9 @@ async def get_me(user: User = Depends(get_current_user)):
     """Return the profile of the currently authenticated user."""
     return user
 
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 # Prediction & Inference Endpoints
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 
 @router.post("/predict", response_model=PredictionResponse)
 async def predict_endpoint(
@@ -129,6 +159,7 @@ async def predict_endpoint(
     user: User = Depends(get_current_user),
 ):
     """Upload a Chest X-ray image for pneumonia prediction and Grad-CAM generation."""
+    start = time.perf_counter()
     image_bytes = await validate_upload(file)
     prediction = await run_prediction(
         db=db,
@@ -136,9 +167,14 @@ async def predict_endpoint(
         image_bytes=image_bytes,
         original_filename=file.filename or "xray.png",
     )
-    
+
+    elapsed = (time.perf_counter() - start) * 1000
+    _metrics["request_count"] += 1
+    _metrics["total_latency_ms"] += elapsed
+    _metrics["prediction_count"] += 1
+
     heatmap_url = f"/api/v1/prediction/{prediction.id}/heatmap" if prediction.heatmap_path else None
-    
+
     return PredictionResponse(
         id=prediction.id,
         filename=prediction.filename,
@@ -159,6 +195,7 @@ async def generate_report_endpoint(
     user: User = Depends(get_current_user),
 ):
     """Generate a structured LLM clinical report for a completed prediction."""
+    start = time.perf_counter()
     try:
         report_text, provider = await generate_clinical_report(
             db=db,
@@ -174,15 +211,20 @@ async def generate_report_endpoint(
             detail=make_error("NOT_FOUND", str(e)),
         )
 
+    elapsed = (time.perf_counter() - start) * 1000
+    _metrics["request_count"] += 1
+    _metrics["total_latency_ms"] += elapsed
+    _metrics["report_count"] += 1
+
     return ReportResponse(
         prediction_id=req.prediction_id,
         report_text=report_text,
         generated_by=provider,
     )
 
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 # History & Detail Endpoints
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 
 @router.get("/history", response_model=PaginatedResponse)
 async def history_endpoint(
@@ -240,7 +282,6 @@ async def get_prediction_detail(
     user: User = Depends(get_current_user),
 ):
     """Retrieve full details of a specific prediction record."""
-    import uuid
     try:
         prediction_id = uuid.UUID(id)
     except ValueError:
@@ -281,7 +322,6 @@ async def delete_prediction_endpoint(
     user: User = Depends(get_current_user),
 ):
     """Delete a prediction record and its associated images from disk."""
-    import uuid
     try:
         prediction_id = uuid.UUID(id)
     except ValueError:
@@ -298,9 +338,9 @@ async def delete_prediction_endpoint(
         )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 # File & Artifact Serving Endpoints
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 
 @router.get("/prediction/{id}/heatmap")
 async def get_heatmap_file(
@@ -309,7 +349,6 @@ async def get_heatmap_file(
     user: User = Depends(get_current_user),
 ):
     """Serve the generated Grad-CAM heatmap image."""
-    import uuid
     try:
         prediction_id = uuid.UUID(id)
     except ValueError:
@@ -329,7 +368,6 @@ async def get_original_image_file(
     user: User = Depends(get_current_user),
 ):
     """Serve the original uploaded X-ray image."""
-    import uuid
     try:
         prediction_id = uuid.UUID(id)
     except ValueError:
@@ -349,7 +387,6 @@ async def download_pdf_report(
     user: User = Depends(get_current_user),
 ):
     """Generate and stream a PDF clinical report."""
-    import uuid
     try:
         prediction_id = uuid.UUID(id)
     except ValueError:
@@ -361,7 +398,7 @@ async def download_pdf_report(
 
     pdf_bytes = generate_pdf(item)
     filename = f"pulmosight_report_{item.id}.pdf"
-    
+
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
