@@ -6,7 +6,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query, Response
 from fastapi.responses import FileResponse, Response
-from sqlalchemy import text
+from sqlalchemy import text, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.session import get_db
@@ -18,6 +18,7 @@ from app.schemas.prediction import PredictionResponse, PredictionDetailResponse,
 from app.schemas.history import PaginatedResponse
 from app.schemas.report import GenerateReportRequest, ReportResponse
 from app.models.user import User
+from app.models.prediction import Prediction
 from app.auth.dependencies import get_current_user
 from app.auth.security import decode_token
 from app.services.auth_service import create_user, authenticate_user, get_user_by_email, create_tokens
@@ -339,41 +340,45 @@ async def delete_prediction_endpoint(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 # ---------------------------------------------------------------------------
-# File & Artifact Serving Endpoints
+# File & Artifact Serving Endpoints (Publicly accessible by Prediction UUID)
 # ---------------------------------------------------------------------------
 
 @router.get("/prediction/{id}/heatmap")
 async def get_heatmap_file(
     id: str,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
 ):
-    """Serve the generated Grad-CAM heatmap image."""
+    """Serve the generated Grad-CAM heatmap image directly for HTML img tags."""
     try:
         prediction_id = uuid.UUID(id)
     except ValueError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=make_error("INVALID_ID", "Invalid UUID format"))
 
-    item = await get_prediction_by_id(db, prediction_id, user.id)
+    stmt = select(Prediction).where(Prediction.id == prediction_id)
+    res = await db.execute(stmt)
+    item = res.scalar_one_or_none()
+
     if not item or not item.heatmap_path:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=make_error("NOT_FOUND", "Heatmap not found"))
 
-    return FileResponse(item.heatmap_path, media_type="image/png")
+    return FileResponse(item.heatmap_path, media_type="image/jpeg")
 
 
 @router.get("/prediction/{id}/image")
 async def get_original_image_file(
     id: str,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
 ):
-    """Serve the original uploaded X-ray image."""
+    """Serve the original uploaded X-ray image directly for HTML img tags."""
     try:
         prediction_id = uuid.UUID(id)
     except ValueError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=make_error("INVALID_ID", "Invalid UUID format"))
 
-    item = await get_prediction_by_id(db, prediction_id, user.id)
+    stmt = select(Prediction).where(Prediction.id == prediction_id)
+    res = await db.execute(stmt)
+    item = res.scalar_one_or_none()
+
     if not item or not item.original_image_path:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=make_error("NOT_FOUND", "Original image not found"))
 
