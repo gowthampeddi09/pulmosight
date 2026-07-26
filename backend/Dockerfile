@@ -15,6 +15,7 @@ RUN pip install --no-cache-dir torch torchvision --index-url https://download.py
 COPY . .
 
 RUN mkdir -p uploads/heatmaps weights
+COPY weights/best_model.pth /app/weights/best_model.pth
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

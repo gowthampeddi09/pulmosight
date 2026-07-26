@@ -29,8 +29,8 @@ def _build_efficientnet() -> nn.Module:
 
 def load_model() -> nn.Module:
     """
-    Load model weights from checkpoint if available, otherwise fallback.
-    Searches multiple path locations to ensure weights are found in Docker and local environments.
+    Load fine-tuned model weights from checkpoint.
+    Searches multiple path locations across Docker and local execution contexts.
     """
     global _model, _model_metadata
 
@@ -42,10 +42,10 @@ def load_model() -> nn.Module:
     # Candidate checkpoint locations across docker, backend, and root execution contexts
     base_dir = Path(__file__).resolve().parent.parent.parent
     candidate_paths = [
-        settings.model_path,
+        "/app/weights/best_model.pth",
         "weights/best_model.pth",
         "backend/weights/best_model.pth",
-        "/app/weights/best_model.pth",
+        settings.model_path,
         str(base_dir / "weights" / "best_model.pth"),
         str(base_dir.parent / "weights" / "best_model.pth"),
     ]
@@ -57,7 +57,7 @@ def load_model() -> nn.Module:
             break
 
     if checkpoint_path:
-        log.info("Loading trained PyTorch weights from %s", checkpoint_path)
+        log.info("Loading fine-tuned PyTorch weights from %s", checkpoint_path)
         checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
         model.load_state_dict(checkpoint["model_state_dict"])
         _model_metadata = {
@@ -65,17 +65,10 @@ def load_model() -> nn.Module:
             "training_date": checkpoint.get("training_date"),
             "metrics": checkpoint.get("metrics"),
         }
-        log.info("Model loaded successfully (version %s)", _model_metadata["version"])
+        log.info("Fine-tuned PyTorch Model loaded successfully (version %s)", _model_metadata["version"])
     else:
-        log.warning(
-            "No trained checkpoint found in %s — using pretrained backbone fallback.",
-            candidate_paths,
-        )
-        _model_metadata = {
-            "version": settings.model_version + "-pretrained",
-            "training_date": None,
-            "metrics": None,
-        }
+        log.error("CRITICAL ERROR: No trained checkpoint found in candidate locations: %s", candidate_paths)
+        raise FileNotFoundError(f"Fine-tuned PyTorch model weights missing from candidate paths: {candidate_paths}")
 
     model.eval()
     _model = model
