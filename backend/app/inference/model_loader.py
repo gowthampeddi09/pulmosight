@@ -29,9 +29,8 @@ def _build_efficientnet() -> nn.Module:
 
 def load_model() -> nn.Module:
     """
-    Load model weights from checkpoint if available, otherwise use
-    pretrained ImageNet backbone with an untrained classification head.
-    Returns the model in eval mode.
+    Load model weights from checkpoint if available, otherwise fallback.
+    Searches multiple path locations to ensure weights are found in Docker and local environments.
     """
     global _model, _model_metadata
 
@@ -39,10 +38,26 @@ def load_model() -> nn.Module:
         return _model
 
     model = _build_efficientnet()
-    checkpoint_path = settings.model_path
+    
+    # Candidate checkpoint locations across docker, backend, and root execution contexts
+    base_dir = Path(__file__).resolve().parent.parent.parent
+    candidate_paths = [
+        settings.model_path,
+        "weights/best_model.pth",
+        "backend/weights/best_model.pth",
+        "/app/weights/best_model.pth",
+        str(base_dir / "weights" / "best_model.pth"),
+        str(base_dir.parent / "weights" / "best_model.pth"),
+    ]
 
-    if os.path.isfile(checkpoint_path):
-        log.info("Loading trained weights from %s", checkpoint_path)
+    checkpoint_path = None
+    for path in candidate_paths:
+        if os.path.isfile(path):
+            checkpoint_path = path
+            break
+
+    if checkpoint_path:
+        log.info("Loading trained PyTorch weights from %s", checkpoint_path)
         checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
         model.load_state_dict(checkpoint["model_state_dict"])
         _model_metadata = {
@@ -53,9 +68,8 @@ def load_model() -> nn.Module:
         log.info("Model loaded successfully (version %s)", _model_metadata["version"])
     else:
         log.warning(
-            "No trained checkpoint at %s — using pretrained ImageNet backbone with untrained head. "
-            "Predictions will be unreliable until a trained model is provided.",
-            checkpoint_path,
+            "No trained checkpoint found in %s — using pretrained backbone fallback.",
+            candidate_paths,
         )
         _model_metadata = {
             "version": settings.model_version + "-pretrained",
