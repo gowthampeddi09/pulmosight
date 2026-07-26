@@ -7,13 +7,13 @@ class Settings(BaseSettings):
     api_v1_prefix: str = "/api/v1"
     debug: bool = False
 
-    # Database
-    database_url: str = "postgresql+asyncpg://pulmosight:pulmosight_secret@postgres:5432/pulmosight"
+    # Database — defaults to SQLite for simple single-container cloud deployment if DATABASE_URL is not set
+    database_url: str = "sqlite+aiosqlite:///./pulmosight.db"
 
     # Auth
-    secret_key: str = "change-me"
+    secret_key: str = "f7a9c2e1d4b8a3f6e9c1d5b7a2f4e8c3d6b9a1f5e7c2d4b8a3f6e9c1d5b7a2"
     algorithm: str = "HS256"
-    access_token_expire_minutes: int = 15
+    access_token_expire_minutes: int = 1440
     refresh_token_expire_days: int = 7
 
     # LLM

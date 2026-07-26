@@ -9,7 +9,6 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
 revision: str = '0001_initial_schema'
 down_revision: Union[str, None] = None
@@ -21,7 +20,7 @@ def upgrade() -> None:
     # Users Table
     op.create_table(
         'users',
-        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True),
+        sa.Column('id', sa.UUID(as_uuid=True), primary_key=True),
         sa.Column('email', sa.String(length=320), nullable=False),
         sa.Column('hashed_password', sa.String(length=128), nullable=False),
         sa.Column('full_name', sa.String(length=100), nullable=False),
@@ -31,11 +30,11 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)
 
-    # Predictions Table (sa.Enum automatically handles creation of prediction_label enum type)
+    # Predictions Table
     op.create_table(
         'predictions',
-        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column('user_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('users.id', ondelete='CASCADE'), nullable=False),
+        sa.Column('id', sa.UUID(as_uuid=True), primary_key=True),
+        sa.Column('user_id', sa.UUID(as_uuid=True), sa.ForeignKey('users.id', ondelete='CASCADE'), nullable=False),
         sa.Column('filename', sa.String(length=255), nullable=False),
         sa.Column('original_image_path', sa.String(length=500), nullable=False),
         sa.Column('prediction', sa.Enum('PNEUMONIA', 'NORMAL', name='prediction_label'), nullable=False),
@@ -59,6 +58,3 @@ def downgrade() -> None:
     op.drop_table('predictions')
     op.drop_index(op.f('ix_users_email'), table_name='users')
     op.drop_table('users')
-    
-    prediction_label_enum = postgresql.ENUM('PNEUMONIA', 'NORMAL', name='prediction_label')
-    prediction_label_enum.drop(op.get_bind(), checkfirst=True)
