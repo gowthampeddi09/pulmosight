@@ -32,7 +32,6 @@ async def call_groq(prompt: str, timeout: float = 30.0) -> Optional[str]:
 
         def _call():
             client = Groq(api_key=settings.groq_api_key)
-            # Try active Groq model names
             for model_name in ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "llama3-70b-8192"]:
                 try:
                     response = client.chat.completions.create(
@@ -42,7 +41,7 @@ async def call_groq(prompt: str, timeout: float = 30.0) -> Optional[str]:
                         temperature=0.3,
                     )
                     if response.choices and response.choices[0].message.content:
-                        log.info("Groq (%s) responded successfully", model_name)
+                        log.info("Groq (%s) responded successfully (%d chars)", model_name, len(response.choices[0].message.content))
                         return response.choices[0].message.content
                 except Exception as err:
                     log.warning("Groq model %s error: %s", model_name, err)
@@ -69,7 +68,7 @@ async def call_gemini(prompt: str, timeout: float = 30.0) -> Optional[str]:
 
     try:
         def _call():
-            for model_name in ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.5-flash"]:
+            for model_name in ["gemini-2.0-flash-lite", "gemini-flash-latest", "gemini-3.6-flash", "gemini-pro-latest"]:
                 try:
                     model = genai.GenerativeModel(model_name)
                     res = model.generate_content(prompt)
