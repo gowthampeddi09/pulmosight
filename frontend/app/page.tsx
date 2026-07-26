@@ -76,6 +76,15 @@ export default function Home() {
 
   const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
+  // Helper to extract clean error string
+  const getErrorMessage = (err: any, fallback: string) => {
+    return err.response?.data?.error?.message ||
+      err.response?.data?.detail?.error?.message ||
+      err.response?.data?.detail ||
+      err.message ||
+      fallback;
+  };
+
   // ---------- Parse Markdown Report into Rich Hospital-Grade Sections ----------
   const parseMarkdownReport = (text: string): ParsedReport => {
     const sections: ParsedReport = { rawText: text, differentials: [], recommendations: [], limitations: [] };
@@ -130,7 +139,7 @@ export default function Home() {
       setToken(accessToken);
       localStorage.setItem('access_token', accessToken);
     } catch (err: any) {
-      setError(err.response?.data?.detail?.error?.message || err.response?.data?.error?.message || 'Authentication failed');
+      setError(getErrorMessage(err, 'Authentication failed'));
     } finally {
       setLoading(false);
     }
@@ -199,7 +208,7 @@ export default function Home() {
       });
       setPrediction(res.data);
     } catch (err: any) {
-      setError(err.response?.data?.detail?.error?.message || err.response?.data?.error?.message || 'Inference failed');
+      setError(getErrorMessage(err, 'Inference failed'));
     } finally {
       setLoading(false);
     }
@@ -221,7 +230,7 @@ export default function Home() {
       setReport(reportText);
       setParsedReport(parseMarkdownReport(reportText));
     } catch (err: any) {
-      setError(err.response?.data?.detail?.error?.message || err.response?.data?.error?.message || 'Report generation failed');
+      setError(getErrorMessage(err, 'Report generation failed'));
     } finally {
       setLoading(false);
     }
