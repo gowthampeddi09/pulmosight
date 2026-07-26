@@ -10,6 +10,7 @@ alembic==1.14.1
 
 # Auth
 python-jose[cryptography]==3.3.0
+bcrypt==4.0.1
 passlib[bcrypt]==1.7.4
 
 # Validation & Config
@@ -23,6 +24,7 @@ numpy==2.2.2
 
 # LLM
 google-generativeai==0.8.4
+groq==0.18.0
 
 # PDF
 reportlab==4.2.5
