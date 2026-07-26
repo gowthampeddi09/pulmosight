@@ -19,7 +19,6 @@ log = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     log.info("Starting %s application", settings.app_name)
-    # Pre-warm model in background
     try:
         load_model()
         log.info("PyTorch model initialized during startup")
@@ -44,6 +43,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/")
+async def root():
+    """Root endpoint welcoming API visitors and pointing to OpenAPI documentation."""
+    return {
+        "status": "online",
+        "app": settings.app_name,
+        "version": settings.model_version,
+        "docs": "/docs",
+        "health": "/api/v1/health",
+    }
 
 
 @app.exception_handler(HTTPException)
